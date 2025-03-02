@@ -36,9 +36,6 @@ impl error::Error for ApiClientError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             ApiClientError::DeserializeError(ref e) => Some(e),
-            // The cause is the underlying implementation error type. Is implicitly
-            // cast to the trait object `&error::Error`. This works because the
-            // underlying type already implements the `Error` trait.
             ApiClientError::RequestError(ref e) => Some(e),
         }
     }
