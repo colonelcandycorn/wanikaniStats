@@ -2,8 +2,59 @@ use chrono::{DateTime, Local};
 use reqwest;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::error;
 use std::fmt;
 use std::marker::PhantomData;
+use std::sync::Arc;
+
+const USER_URL: &str = "https://api.wanikani.com/v2/user";
+const RESETS_URL: &str = "https://api.wanikani.com/v2/resets";
+const REVIEW_STATS_URL: &str = "https://api.wanikani.com/v2/review_statistics";
+const SUBJECT_URL: &str = "https://api.wanikani.com/v2/subjects/440";
+const ASSIGNMENT_URL: &str = "https://api.wanikani.com/v2/assignments";
+
+#[derive(Debug, Clone)]
+pub enum ApiClientError {
+    DeserializeError(Arc<serde_json::Error>),
+    RequestError(Arc<reqwest::Error>),
+}
+
+impl fmt::Display for ApiClientError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ApiClientError::DeserializeError(..) => {
+                write!(f, "when deserializing ran into a problem")
+            }
+            ApiClientError::RequestError(..) => {
+                write!(f, "when trying to make a request ran into an error")
+            }
+        }
+    }
+}
+
+impl error::Error for ApiClientError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match *self {
+            ApiClientError::DeserializeError(ref e) => Some(e),
+            // The cause is the underlying implementation error type. Is implicitly
+            // cast to the trait object `&error::Error`. This works because the
+            // underlying type already implements the `Error` trait.
+            ApiClientError::RequestError(ref e) => Some(e),
+        }
+    }
+}
+
+impl From<reqwest::Error> for ApiClientError {
+    fn from(err: reqwest::Error) -> ApiClientError {
+        ApiClientError::RequestError(Arc::new(err))
+    }
+}
+
+impl From<serde_json::Error> for ApiClientError {
+    fn from(value: serde_json::Error) -> Self {
+        ApiClientError::DeserializeError(Arc::new(value))
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct User {
@@ -93,7 +144,7 @@ impl<'a> ApiClient<'a> {
         ApiClient { token, client }
     }
 
-    pub async fn get_response<T>(&self, url: &str) -> Result<ReqwestResponse<T>, reqwest::Error>
+    async fn get_response<T>(&self, url: &str) -> Result<ReqwestResponse<T>, ApiClientError>
     where
         T: DeserializeOwned,
     {
@@ -110,20 +161,48 @@ impl<'a> ApiClient<'a> {
         })
     }
 
-    pub async fn raw_response_to_data<T>(
+    async fn raw_response_to_data<T>(
         &self,
         raw_response: ReqwestResponse<T>,
-    ) -> Result<T, serde_json::Error>
+    ) -> Result<T, ApiClientError>
     where
         T: DeserializeOwned,
     {
-        let parsed = raw_response
-            .raw_response
-            .json::<T>()
-            .await
-            .map_err(serde::de::Error::custom)?;
+        let parsed = raw_response.raw_response.json::<T>().await?;
 
         Ok(parsed)
+    }
+
+    pub async fn get_user_data(&self) -> Result<User, ApiClientError> {
+        let raw = self.get_response::<Response<User>>(USER_URL).await?;
+        let processed = self.raw_response_to_data(raw).await?;
+
+        Ok(processed.data)
+    }
+
+    pub async fn get_all_review_statistics(
+        &self,
+    ) -> Result<Vec<Response<ReviewStatistic>>, ApiClientError> {
+        let raw = self
+            .get_response::<PagedData<ReviewStatistic>>(REVIEW_STATS_URL)
+            .await?;
+        let processed = self.raw_response_to_data(raw).await?;
+        let mut result = processed.data;
+
+        while let Some(PageData {
+            next_page: Some(ref url),
+            ..
+        }) = processed.pages
+        {
+            let raw = self
+                .get_response::<PagedData<ReviewStatistic>>(&url)
+                .await?;
+            let mut processed = self.raw_response_to_data(raw).await?;
+
+            result.append(&mut processed.data);
+        }
+
+        Ok(result)
     }
 }
 
