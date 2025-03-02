@@ -1,4 +1,4 @@
-use wanikani_stats::data_processing::api_client::ApiClient;
+use wanikani_stats::data_processing::api_client::{ApiClient, ReviewStatistic};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -11,7 +11,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_client = ApiClient::new(wk_token, &client);
 
     let user_data = api_client.get_user_data().await?;
-    let review_data = api_client.get_all_review_statistics().await?;
+    let review_data = api_client.get_all_pages_of_paged_data::<ReviewStatistic>("https://api.wanikani.com/v2/review_statistics").await?;
 
     println!("{:?}", user_data);
     println!("{:?}", &review_data[..3]);

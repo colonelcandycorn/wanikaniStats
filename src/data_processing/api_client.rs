@@ -180,14 +180,17 @@ impl<'a> ApiClient<'a> {
         Ok(processed.data)
     }
 
-    pub async fn get_all_review_statistics(
+    pub async fn get_all_pages_of_paged_data<T>(
         &self,
-    ) -> Result<Vec<Response<ReviewStatistic>>, ApiClientError> {
+        paged_url: &str,
+    ) -> Result<Vec<T>, ApiClientError>
+        where T: DeserializeOwned
+    {
         let raw = self
-            .get_response::<PagedData<ReviewStatistic>>(REVIEW_STATS_URL)
+            .get_response::<PagedData<T>>(paged_url)
             .await?;
         let processed = self.raw_response_to_data(raw).await?;
-        let mut result = processed.data;
+        let mut result: Vec<T> = processed.data.into_iter().map(|data| data.data ).collect();
 
         while let Some(PageData {
             next_page: Some(ref url),
@@ -195,11 +198,11 @@ impl<'a> ApiClient<'a> {
         }) = processed.pages
         {
             let raw = self
-                .get_response::<PagedData<ReviewStatistic>>(&url)
+                .get_response::<PagedData<T>>(&url)
                 .await?;
-            let mut processed = self.raw_response_to_data(raw).await?;
+            let processed = self.raw_response_to_data(raw).await?;
 
-            result.append(&mut processed.data);
+            result.append(&mut processed.data.into_iter().map(|data| data.data ).collect());
         }
 
         Ok(result)
