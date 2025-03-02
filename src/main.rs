@@ -23,6 +23,44 @@ struct PageData {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+struct ReviewStatistic {
+    created_at: DateTime<Local>,
+    meaning_correct: i32,
+    meaning_current_streak: i32,
+    meaning_incorrect: i32,
+    meaning_max_streak: i32,
+    percentage_correct: i32,
+    reading_correct: i32,
+    reading_current_streak: i32,
+    reading_incorrect: i32,
+    reading_max_streak: i32,
+    subject_id: i32,
+    subject_type: String
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct Meanings {
+    meaning: String,
+    primary: bool
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct Subject {
+    characters: String,
+    level: i32,
+    spaced_repetition_system_id: i32,
+    meanings: Vec<Meanings>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct Assignment {
+    created_at: Option<DateTime<Local>>,
+    passed_at: Option<DateTime<Local>>,
+    srs_stage: i32,
+    subject_id: i32,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 struct Reset {
     created_at: DateTime<Local>,
     confirmed_at: DateTime<Local>,
@@ -31,8 +69,9 @@ struct Reset {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-struct VecData<T> {
+struct PagedData<T> {
     pages: Option<PageData>,
+    total_count: i32,
     data: Vec<Response<T>>,
 }
 
@@ -48,15 +87,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let wk_token = std::env::var("WK_TOKEN").expect("WK_TOKEN must be set");
     let test_user_url = "https://api.wanikani.com/v2/user";
     let resets_url = "https://api.wanikani.com/v2/resets";
+    let review_stats_url = "https://api.wanikani.com/v2/review_statistics";
+    let subject_url = "https://api.wanikani.com/v2/subjects/440";
+    let assignments_url = "https://api.wanikani.com/v2/assignments";
 
     let client = reqwest::Client::new();
 
-    type ResetStuff = VecData<Reset>;
+    type ResetStuff = PagedData<Reset>;
+    type ReviewStatisticStuff = PagedData<ReviewStatistic>;
 
     test_api::<Response<User>>(test_user_url, &wk_token, &client).await.unwrap();
     test_api::<ResetStuff>(&resets_url, &wk_token, &client).await.unwrap();
-
-    
+    // test_api::<ReviewStatisticStuff>(&review_stats_url, &wk_token, &client).await.unwrap();
+    test_api::<Response<Subject>>(&subject_url, &wk_token, &client).await.unwrap();
+    test_api::<PagedData<Assignment>>(&assignments_url, &wk_token, &client).await.unwrap();
 
     Ok(())
 }
