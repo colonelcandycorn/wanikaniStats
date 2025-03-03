@@ -1,8 +1,9 @@
 use chrono::{DateTime, Local};
+use governor::DefaultDirectRateLimiter;
 use reqwest;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{ HashMap, HashSet };
 use std::error;
 use std::fmt;
 use std::marker::PhantomData;
@@ -11,48 +12,11 @@ use std::sync::Arc;
 const USER_URL: &str = "https://api.wanikani.com/v2/user";
 const RESETS_URL: &str = "https://api.wanikani.com/v2/resets";
 const REVIEW_STATS_URL: &str = "https://api.wanikani.com/v2/review_statistics";
-const SUBJECT_URL: &str = "https://api.wanikani.com/v2/subjects/";
+const SUBJECT_URL: &str = "https://api.wanikani.com/v2/subjects";
 const ASSIGNMENT_URL: &str = "https://api.wanikani.com/v2/assignments";
 
-#[derive(Debug, Clone)]
-pub enum ApiClientError {
-    DeserializeError(Arc<serde_json::Error>),
-    RequestError(Arc<reqwest::Error>),
-}
+type ApiClientError = reqwest::Error;
 
-impl fmt::Display for ApiClientError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            ApiClientError::DeserializeError(..) => {
-                write!(f, "when deserializing ran into a problem")
-            }
-            ApiClientError::RequestError(..) => {
-                write!(f, "when trying to make a request ran into an error")
-            }
-        }
-    }
-}
-
-impl error::Error for ApiClientError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match *self {
-            ApiClientError::DeserializeError(ref e) => Some(e),
-            ApiClientError::RequestError(ref e) => Some(e),
-        }
-    }
-}
-
-impl From<reqwest::Error> for ApiClientError {
-    fn from(err: reqwest::Error) -> ApiClientError {
-        ApiClientError::RequestError(Arc::new(err))
-    }
-}
-
-impl From<serde_json::Error> for ApiClientError {
-    fn from(value: serde_json::Error) -> Self {
-        ApiClientError::DeserializeError(Arc::new(value))
-    }
-}
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct User {
@@ -64,8 +28,8 @@ pub struct User {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct PageData {
     per_page: i32,
-    next_page: Option<String>,
-    last_page: Option<String>,
+    next_url: Option<String>,
+    previous_url: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -86,13 +50,13 @@ pub struct ReviewStatistic {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Meanings {
-    meaning: String,
+    meaning: Option<String>,
     primary: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Subject {
-    characters: String,
+    characters: Option<String>,
     level: i32,
     spaced_repetition_system_id: i32,
     meanings: Vec<Meanings>,
@@ -123,6 +87,7 @@ pub struct PagedData<T> {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Response<T> {
+    id: Option<i32>,
     data: T,
 }
 
@@ -135,29 +100,42 @@ pub struct ReqwestResponse<T> {
 pub struct ApiClient<'a> {
     token: String,
     client: &'a reqwest::Client,
+    limiter: DefaultDirectRateLimiter
 }
 
 impl<'a> ApiClient<'a> {
-    pub fn new(token: String, client: &'a reqwest::Client) -> Self {
-        ApiClient { token, client }
+    pub fn new(token: String, client: &'a reqwest::Client, limiter: DefaultDirectRateLimiter) -> Self {
+        ApiClient { token, client, limiter }
     }
 
     async fn get_response<T>(&self, url: &str) -> Result<ReqwestResponse<T>, ApiClientError>
     where
         T: DeserializeOwned,
     {
-        let response = self
+        Ok(self.get_response_with_params::<T, String>(url, None).await?)
+    }
+
+    async fn get_response_with_params<T, K>(&self, url: &str, params: Option<Vec<(&str, K)>>) -> Result<ReqwestResponse<T>, ApiClientError>
+    where
+        T: DeserializeOwned,
+        K: Serialize {
+            let mut response = self
             .client
             .get(url)
-            .header("Authorization", format!("Bearer {}", self.token))
-            .send()
-            .await?;
+            .header("Authorization", format!("Bearer {}", self.token));
+
+        if let Some(valid_param) = params {
+            response = response.query(&valid_param)
+        }
+
+
+        let response = response.send().await?;
 
         Ok(ReqwestResponse::<T> {
             raw_response: response.error_for_status()?,
             resource_type: PhantomData,
         })
-    }
+        }
 
     async fn raw_response_to_data<T>(
         &self,
@@ -178,66 +156,79 @@ impl<'a> ApiClient<'a> {
         Ok(processed.data)
     }
 
-    pub async fn get_non_paginated_data<T>(&self, url: &str) -> Result<T, ApiClientError>
+    pub async fn get_non_paginated_data<T>(&self, url: &str) -> Result<Response<T>, ApiClientError>
         where T: DeserializeOwned {
+            self.limiter.until_ready().await;
             let raw = self.get_response::<Response<T>>(url).await?;
             let processed = self.raw_response_to_data(raw).await?;
 
-            Ok(processed.data)
+            Ok(processed)
         }
 
     pub async fn get_all_pages_of_paged_data<T>(
         &self,
         paged_url: &str,
-    ) -> Result<Vec<T>, ApiClientError>
+    ) -> Result<Vec<Response<T>>, ApiClientError>
         where T: DeserializeOwned
     {
-        let raw = self
-            .get_response::<PagedData<T>>(paged_url)
-            .await?;
-        let processed = self.raw_response_to_data(raw).await?;
-        let mut result: Vec<T> = processed.data.into_iter().map(|data| data.data ).collect();
+        Ok(self.get_all_pages_of_paged_data_with_params::<T, String>(paged_url, None).await?)
+    }
+
+    pub async fn get_all_pages_of_paged_data_with_params<T, K>(
+        &self,
+        paged_url: &str,
+        params: Option<Vec<(&str, K)>>
+    ) -> Result<Vec<Response<T>>, ApiClientError>
+        where T: DeserializeOwned,
+        K: Serialize
+    {
+        self.limiter.until_ready().await;
+
+        let raw = match params {
+            Some(_) => self.get_response_with_params::<PagedData<T>, K>(paged_url, params).await?,
+            None => self.get_response::<PagedData<T>>(paged_url).await?
+        };
+        let mut processed = self.raw_response_to_data(raw).await?;
+        let mut result: Vec<Response<T>> = processed.data;
+
+        println!("Paged Data: {:?} Total Count: {:?}", processed.pages, processed.total_count);
 
         while let Some(PageData {
-            next_page: Some(ref url),
+            next_url: Some(ref url),
             ..
         }) = processed.pages
         {
+            self.limiter.until_ready().await;
             let raw = self
                 .get_response::<PagedData<T>>(&url)
                 .await?;
-            let processed = self.raw_response_to_data(raw).await?;
+            processed = self.raw_response_to_data(raw).await?;
 
-            result.append(&mut processed.data.into_iter().map(|data| data.data ).collect());
+            result.append(&mut processed.data);
         }
 
         Ok(result)
     }
 
-    pub fn get_list_of_subjects_to_request(&self, review_stats: &Vec<ReviewStatistic>) -> Vec<i32> {
-        let mut result: Vec<i32> = vec![];
+    pub fn get_list_of_subjects_to_request(&self, review_stats: &Vec<Response<ReviewStatistic>>) -> Vec<i32> {
+        let mut result: HashSet<i32> = HashSet::new();
+
+        println!("Length of review_stat vec: {:?}", review_stats.len());
 
         for stat in review_stats {
-            result.push(stat.subject_id)
+            result.insert(stat.data.subject_id);
         }
 
-        result
+        result.into_iter().collect()
     }
 
     pub async fn construct_id_to_subject_hash(&self, subject_list: &Vec<i32>) -> Result<HashMap<i32, Subject>, ApiClientError> {
-        let mut subject_hash: HashMap<i32, Subject> = HashMap::new();
+        let subject_list_strs: Vec<String> = subject_list.into_iter().map(|subject| subject.to_string()).collect();
+        let query_params = vec![("ids", subject_list_strs.join(","))];
+        let all_subjects: Vec<Response<Subject>> = self.get_all_pages_of_paged_data_with_params(SUBJECT_URL, Some(query_params)).await?;
+        let result: HashMap<i32, Subject> = all_subjects.into_iter().map( |response| (response.id.unwrap(), response.data)).collect();
 
-        for subject_id in subject_list {
-            if subject_hash.contains_key(subject_id) { continue; }
-
-            let tmp_str = format!("{}{}", SUBJECT_URL, subject_id);
-
-            let curr_subject = self.get_non_paginated_data::<Subject>(&tmp_str).await?;
-
-            subject_hash.insert(*subject_id, curr_subject);
-        }
-
-        Ok(subject_hash)
+        Ok(result)
     }
 }
 
