@@ -2,6 +2,7 @@ use chrono::{DateTime, Local};
 use reqwest;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::error;
 use std::fmt;
 use std::marker::PhantomData;
@@ -10,7 +11,7 @@ use std::sync::Arc;
 const USER_URL: &str = "https://api.wanikani.com/v2/user";
 const RESETS_URL: &str = "https://api.wanikani.com/v2/resets";
 const REVIEW_STATS_URL: &str = "https://api.wanikani.com/v2/review_statistics";
-const SUBJECT_URL: &str = "https://api.wanikani.com/v2/subjects/440";
+const SUBJECT_URL: &str = "https://api.wanikani.com/v2/subjects/";
 const ASSIGNMENT_URL: &str = "https://api.wanikani.com/v2/assignments";
 
 #[derive(Debug, Clone)]
@@ -177,6 +178,14 @@ impl<'a> ApiClient<'a> {
         Ok(processed.data)
     }
 
+    pub async fn get_non_paginated_data<T>(&self, url: &str) -> Result<T, ApiClientError>
+        where T: DeserializeOwned {
+            let raw = self.get_response::<Response<T>>(url).await?;
+            let processed = self.raw_response_to_data(raw).await?;
+
+            Ok(processed.data)
+        }
+
     pub async fn get_all_pages_of_paged_data<T>(
         &self,
         paged_url: &str,
@@ -203,6 +212,32 @@ impl<'a> ApiClient<'a> {
         }
 
         Ok(result)
+    }
+
+    pub fn get_list_of_subjects_to_request(&self, review_stats: &Vec<ReviewStatistic>) -> Vec<i32> {
+        let mut result: Vec<i32> = vec![];
+
+        for stat in review_stats {
+            result.push(stat.subject_id)
+        }
+
+        result
+    }
+
+    pub async fn construct_id_to_subject_hash(&self, subject_list: &Vec<i32>) -> Result<HashMap<i32, Subject>, ApiClientError> {
+        let mut subject_hash: HashMap<i32, Subject> = HashMap::new();
+
+        for subject_id in subject_list {
+            if subject_hash.contains_key(subject_id) { continue; }
+
+            let tmp_str = format!("{}{}", SUBJECT_URL, subject_id);
+
+            let curr_subject = self.get_non_paginated_data::<Subject>(&tmp_str).await?;
+
+            subject_hash.insert(*subject_id, curr_subject);
+        }
+
+        Ok(subject_hash)
     }
 }
 
