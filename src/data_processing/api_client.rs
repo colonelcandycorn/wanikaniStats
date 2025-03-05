@@ -99,14 +99,14 @@ pub struct ReqwestResponse<T> {
 pub struct ApiClient<'a> {
     token: String,
     client: &'a reqwest::Client,
-    limiter: DefaultDirectRateLimiter,
+    limiter:&'a DefaultDirectRateLimiter,
 }
 
 impl<'a> ApiClient<'a> {
     pub fn new(
         token: String,
         client: &'a reqwest::Client,
-        limiter: DefaultDirectRateLimiter,
+        limiter: &'a DefaultDirectRateLimiter,
     ) -> Self {
         ApiClient {
             token,
@@ -213,11 +213,6 @@ impl<'a> ApiClient<'a> {
         let mut processed = self.raw_response_to_data(raw).await?;
         let mut result: Vec<Response<T>> = processed.data;
 
-        println!(
-            "Paged Data: {:?} Total Count: {:?}",
-            processed.pages, processed.total_count
-        );
-
         while let Some(PageData {
             next_url: Some(ref url),
             ..
@@ -238,8 +233,6 @@ impl<'a> ApiClient<'a> {
         review_stats: &Vec<Response<ReviewStatistic>>,
     ) -> Vec<i32> {
         let mut result: HashSet<i32> = HashSet::new();
-
-        println!("Length of review_stat vec: {:?}", review_stats.len());
 
         for stat in review_stats {
             result.insert(stat.data.subject_id);

@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         governor::clock::DefaultClock::default(),
     );
 
-    let api_client = ApiClient::new(wk_token, &client, limiter);
+    let api_client = ApiClient::new(wk_token, &client, &limiter);
 
     let user_data = api_client.get_user_data().await?;
     let review_data = api_client
