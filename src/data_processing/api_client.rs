@@ -1,13 +1,11 @@
 use chrono::{DateTime, Local};
 use governor::DefaultDirectRateLimiter;
-use reqwest;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::error;
 use std::fmt;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 const USER_URL: &str = "https://api.wanikani.com/v2/user";
 const RESETS_URL: &str = "https://api.wanikani.com/v2/resets";
@@ -16,6 +14,135 @@ const SUBJECT_URL: &str = "https://api.wanikani.com/v2/subjects";
 const ASSIGNMENT_URL: &str = "https://api.wanikani.com/v2/assignments";
 
 type ApiClientError = reqwest::Error;
+
+#[derive(Debug)]
+pub struct CompleteUserInfo {
+    user: User,
+    review_stats: Vec<ReviewStatistic>,
+    assignments: Vec<Assignment>,
+    resets: Vec<Reset>,
+    id_to_subjects: HashMap<i32, SubjectWithType>,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum SubjectType {
+    KanaVocabulary,
+    Kanji,
+    Radical,
+    Vocabulary
+}
+
+#[derive(Debug)]
+pub struct MissingSubjectError;
+
+impl fmt::Display for MissingSubjectError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Missing Subject")
+    }
+}
+
+impl error::Error for MissingSubjectError {}
+
+
+#[derive(Debug)]
+pub struct SubjectTypeStats {
+    subject_type: SubjectType,
+    num_of_meaning_correct: i32,
+    num_of_meaning_incorrect: i32,
+    num_of_reading_correct: i32,
+    num_of_reading_incorrect: i32,
+}
+
+
+impl CompleteUserInfo {
+    pub fn pretty_print(&self) {
+        println!("User: {}", self.get_user_name());
+        println!("Level: {}", self.get_level());
+        println!("Started At: {}", self.get_started_at());
+        println!("Number of Resets: {}", self.get_num_of_resets());
+        println!("Most Recent Reset: {:?}", self.get_date_of_most_recent_reset());
+        println!("Number of Passed Radicals: {}", self.get_num_of_passed(SubjectType::Radical).unwrap());
+        println!("Number of Passed Kanji: {}", self.get_num_of_passed(SubjectType::Kanji).unwrap());
+        println!("Number of Passed Vocabulary: {}", self.get_num_of_passed(SubjectType::Vocabulary).unwrap());
+        println!("Number of Passed Kana Vocabulary: {}", self.get_num_of_passed(SubjectType::KanaVocabulary).unwrap());
+        println!("Radical Stats: {:?}", self.get_subject_type_stats(SubjectType::Radical).unwrap());
+        println!("Kanji Stats: {:?}", self.get_subject_type_stats(SubjectType::Kanji).unwrap());
+        println!("Vocabulary Stats: {:?}", self.get_subject_type_stats(SubjectType::Vocabulary).unwrap());
+        println!("Kana Vocabulary Stats: {:?}", self.get_subject_type_stats(SubjectType::KanaVocabulary).unwrap());
+    }
+    pub fn get_user_name(&self) -> &str {
+        &self.user.username
+    }
+
+    pub fn get_level(&self) -> i32 {
+        self.user.level
+    }
+
+    pub fn get_num_of_resets(&self) -> i32 {
+        self.resets.len() as i32
+    }
+
+    pub fn get_date_of_most_recent_reset(&self) -> Option<&DateTime<Local>> {
+        self.resets.iter().map(|reset| &reset.confirmed_at).max()
+    }
+
+    pub fn get_started_at(&self) -> &DateTime<Local> {
+        &self.user.started_at
+    }
+
+    pub fn get_num_of_passed(&self, subject: SubjectType) -> Result<i32, MissingSubjectError> {
+        let mut result = 0;
+
+        for assignment in &self.assignments {
+            let subject_obj = self.id_to_subjects.get(&assignment.subject_id);
+
+            if subject_obj.is_none() {
+                return Err(MissingSubjectError);
+            }
+
+            let subject_type = &subject_obj.unwrap().subject_type;
+
+            if *subject_type == subject && assignment.passed_at.is_some() {
+                result += 1;
+            }
+        }
+
+        Ok(result)
+    }
+
+    pub fn get_subject_type_stats(&self, subject: SubjectType) -> Result<SubjectTypeStats, MissingSubjectError> {
+        let mut meaning_correct = 0;
+        let mut meaning_incorrect = 0;
+        let mut reading_correct = 0;
+        let mut reading_incorrect = 0;
+
+        for review_stat in &self.review_stats {
+            let subject_obj = self.id_to_subjects.get(&review_stat.subject_id);
+
+            if subject_obj.is_none() {
+                return Err(MissingSubjectError);
+            }
+
+            let subject_type = &subject_obj.unwrap().subject_type;
+
+            if *subject_type == subject {
+                meaning_correct += review_stat.meaning_correct;
+                meaning_incorrect += review_stat.meaning_incorrect;
+                reading_correct += review_stat.reading_correct;
+                reading_incorrect += review_stat.reading_incorrect;
+            }
+        }
+
+        Ok(SubjectTypeStats {
+            subject_type: subject,
+            num_of_meaning_correct: meaning_correct,
+            num_of_meaning_incorrect: meaning_incorrect,
+            num_of_reading_correct: reading_correct,
+            num_of_reading_incorrect: reading_incorrect,
+        })
+    }
+
+}
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct User {
@@ -87,6 +214,7 @@ pub struct PagedData<T> {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Response<T> {
     id: Option<i32>,
+    object: String,
     data: T,
 }
 
@@ -105,8 +233,9 @@ pub struct ApiClient<'a> {
 impl<'a> ApiClient<'a> {
     pub fn new(
         token: String,
-        client: &'a reqwest::Client,
-        limiter: &'a DefaultDirectRateLimiter,
+        client: &'a reqwest::Client, // change to arc
+        limiter: &'a DefaultDirectRateLimiter, // change to arc
+        // add cache for subjects
     ) -> Self {
         ApiClient {
             token,
@@ -231,11 +360,16 @@ impl<'a> ApiClient<'a> {
     pub fn get_list_of_subjects_to_request(
         &self,
         review_stats: &Vec<Response<ReviewStatistic>>,
+        assignment_stats: &Vec<Response<Assignment>>,
     ) -> Vec<i32> {
         let mut result: HashSet<i32> = HashSet::new();
 
         for stat in review_stats {
             result.insert(stat.data.subject_id);
+        }
+
+        for assignment in assignment_stats {
+            result.insert(assignment.data.subject_id);
         }
 
         result.into_iter().collect()
@@ -244,7 +378,7 @@ impl<'a> ApiClient<'a> {
     pub async fn construct_id_to_subject_hash(
         &self,
         subject_list: &Vec<i32>,
-    ) -> Result<HashMap<i32, Subject>, ApiClientError> {
+    ) -> Result<HashMap<i32, SubjectWithType>, ApiClientError> {
         let subject_list_strs: Vec<String> = subject_list
             .into_iter()
             .map(|subject| subject.to_string())
@@ -253,12 +387,65 @@ impl<'a> ApiClient<'a> {
         let all_subjects: Vec<Response<Subject>> = self
             .get_all_pages_of_paged_data_with_params(SUBJECT_URL, Some(query_params))
             .await?;
-        let result: HashMap<i32, Subject> = all_subjects
+        let result: HashMap<i32, SubjectWithType> = all_subjects
             .into_iter()
-            .map(|response| (response.id.unwrap(), response.data))
+            .map(|response| {
+                let subject_type = match response.object.as_str() {
+                    "radical" => SubjectType::Radical,
+                    "kanji" => SubjectType::Kanji,
+                    "vocabulary" => SubjectType::Vocabulary,
+                    "kana_vocabulary" => SubjectType::KanaVocabulary,
+                    _ => panic!("Unknown Subject Type"),
+                };
+                (response.id.unwrap(), SubjectWithType::new(response.data, subject_type))
+            })
             .collect();
 
         Ok(result)
+    }
+
+    pub async fn get_all_assignments(&self) -> Result<Vec<Response<Assignment>>, ApiClientError> {
+        self.get_all_pages_of_paged_data(ASSIGNMENT_URL).await
+    }
+
+    pub async fn get_all_resets(&self) -> Result<Vec<Response<Reset>>, ApiClientError> {
+        self.get_all_pages_of_paged_data(RESETS_URL).await
+    }
+
+    pub async fn get_all_review_stats(&self) -> Result<Vec<Response<ReviewStatistic>>, ApiClientError> {
+        self.get_all_pages_of_paged_data(REVIEW_STATS_URL).await
+    }
+
+    pub async fn build_complete_user_info(&self) -> Result<CompleteUserInfo, ApiClientError> {
+        let user_data = self.get_user_data().await?;
+        let review_data = self.get_all_review_stats().await?;
+        let assignment_data = self.get_all_assignments().await?;
+        let reset_data = self.get_all_resets().await?;
+        let sub_vec = self.get_list_of_subjects_to_request(&review_data, &assignment_data);
+        let hashy = self.construct_id_to_subject_hash(&sub_vec).await?;
+
+        Ok(CompleteUserInfo {
+            user: user_data,
+            review_stats: review_data.into_iter().map(|response| response.data).collect(),
+            assignments: assignment_data.into_iter().map(|response| response.data).collect(),
+            resets: reset_data.into_iter().map(|response| response.data).collect(),
+            id_to_subjects: hashy,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct SubjectWithType {
+    subject: Subject,
+    subject_type: SubjectType,
+}
+
+impl SubjectWithType {
+    pub fn new(subject: Subject, subject_type: SubjectType) -> Self {
+        SubjectWithType {
+            subject,
+            subject_type,
+        }
     }
 }
 
