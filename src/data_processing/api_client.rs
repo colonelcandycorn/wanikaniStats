@@ -15,7 +15,7 @@ const ASSIGNMENT_URL: &str = "https://api.wanikani.com/v2/assignments";
 
 type ApiClientError = reqwest::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompleteUserInfo {
     user: User,
     review_stats: Vec<ReviewStatistic>,
@@ -24,12 +24,12 @@ pub struct CompleteUserInfo {
     id_to_subjects: HashMap<i32, SubjectWithType>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SubjectType {
     KanaVocabulary,
     Kanji,
     Radical,
-    Vocabulary
+    Vocabulary,
 }
 
 #[derive(Debug)]
@@ -43,7 +43,6 @@ impl fmt::Display for MissingSubjectError {
 
 impl error::Error for MissingSubjectError {}
 
-
 #[derive(Debug)]
 pub struct SubjectTypeStats {
     subject_type: SubjectType,
@@ -53,22 +52,50 @@ pub struct SubjectTypeStats {
     num_of_reading_incorrect: i32,
 }
 
-
 impl CompleteUserInfo {
     pub fn pretty_print(&self) {
         println!("User: {}", self.get_user_name());
         println!("Level: {}", self.get_level());
         println!("Started At: {}", self.get_started_at());
         println!("Number of Resets: {}", self.get_num_of_resets());
-        println!("Most Recent Reset: {:?}", self.get_date_of_most_recent_reset());
-        println!("Number of Passed Radicals: {}", self.get_num_of_passed(SubjectType::Radical).unwrap());
-        println!("Number of Passed Kanji: {}", self.get_num_of_passed(SubjectType::Kanji).unwrap());
-        println!("Number of Passed Vocabulary: {}", self.get_num_of_passed(SubjectType::Vocabulary).unwrap());
-        println!("Number of Passed Kana Vocabulary: {}", self.get_num_of_passed(SubjectType::KanaVocabulary).unwrap());
-        println!("Radical Stats: {:?}", self.get_subject_type_stats(SubjectType::Radical).unwrap());
-        println!("Kanji Stats: {:?}", self.get_subject_type_stats(SubjectType::Kanji).unwrap());
-        println!("Vocabulary Stats: {:?}", self.get_subject_type_stats(SubjectType::Vocabulary).unwrap());
-        println!("Kana Vocabulary Stats: {:?}", self.get_subject_type_stats(SubjectType::KanaVocabulary).unwrap());
+        println!(
+            "Most Recent Reset: {:?}",
+            self.get_date_of_most_recent_reset()
+        );
+        println!(
+            "Number of Passed Radicals: {}",
+            self.get_num_of_passed(SubjectType::Radical).unwrap()
+        );
+        println!(
+            "Number of Passed Kanji: {}",
+            self.get_num_of_passed(SubjectType::Kanji).unwrap()
+        );
+        println!(
+            "Number of Passed Vocabulary: {}",
+            self.get_num_of_passed(SubjectType::Vocabulary).unwrap()
+        );
+        println!(
+            "Number of Passed Kana Vocabulary: {}",
+            self.get_num_of_passed(SubjectType::KanaVocabulary).unwrap()
+        );
+        println!(
+            "Radical Stats: {:?}",
+            self.get_subject_type_stats(SubjectType::Radical).unwrap()
+        );
+        println!(
+            "Kanji Stats: {:?}",
+            self.get_subject_type_stats(SubjectType::Kanji).unwrap()
+        );
+        println!(
+            "Vocabulary Stats: {:?}",
+            self.get_subject_type_stats(SubjectType::Vocabulary)
+                .unwrap()
+        );
+        println!(
+            "Kana Vocabulary Stats: {:?}",
+            self.get_subject_type_stats(SubjectType::KanaVocabulary)
+                .unwrap()
+        );
     }
     pub fn get_user_name(&self) -> &str {
         &self.user.username
@@ -110,7 +137,10 @@ impl CompleteUserInfo {
         Ok(result)
     }
 
-    pub fn get_subject_type_stats(&self, subject: SubjectType) -> Result<SubjectTypeStats, MissingSubjectError> {
+    pub fn get_subject_type_stats(
+        &self,
+        subject: SubjectType,
+    ) -> Result<SubjectTypeStats, MissingSubjectError> {
         let mut meaning_correct = 0;
         let mut meaning_incorrect = 0;
         let mut reading_correct = 0;
@@ -141,10 +171,9 @@ impl CompleteUserInfo {
             num_of_reading_incorrect: reading_incorrect,
         })
     }
-
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct User {
     level: i32,
     username: String,
@@ -158,7 +187,7 @@ pub struct PageData {
     previous_url: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ReviewStatistic {
     created_at: DateTime<Local>,
     meaning_correct: i32,
@@ -174,13 +203,13 @@ pub struct ReviewStatistic {
     subject_type: String,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Meanings {
     meaning: Option<String>,
     primary: bool,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Subject {
     characters: Option<String>,
     level: i32,
@@ -188,7 +217,7 @@ pub struct Subject {
     meanings: Vec<Meanings>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Assignment {
     created_at: Option<DateTime<Local>>,
     passed_at: Option<DateTime<Local>>,
@@ -196,7 +225,7 @@ pub struct Assignment {
     subject_id: i32,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Reset {
     created_at: DateTime<Local>,
     confirmed_at: DateTime<Local>,
@@ -227,7 +256,7 @@ pub struct ReqwestResponse<T> {
 pub struct ApiClient<'a> {
     token: String,
     client: &'a reqwest::Client,
-    limiter:&'a DefaultDirectRateLimiter,
+    limiter: &'a DefaultDirectRateLimiter,
 }
 
 impl<'a> ApiClient<'a> {
@@ -235,7 +264,7 @@ impl<'a> ApiClient<'a> {
         token: String,
         client: &'a reqwest::Client, // change to arc
         limiter: &'a DefaultDirectRateLimiter, // change to arc
-        // add cache for subjects
+                                     // add cache for subjects
     ) -> Self {
         ApiClient {
             token,
@@ -397,7 +426,10 @@ impl<'a> ApiClient<'a> {
                     "kana_vocabulary" => SubjectType::KanaVocabulary,
                     _ => panic!("Unknown Subject Type"),
                 };
-                (response.id.unwrap(), SubjectWithType::new(response.data, subject_type))
+                (
+                    response.id.unwrap(),
+                    SubjectWithType::new(response.data, subject_type),
+                )
             })
             .collect();
 
@@ -412,7 +444,9 @@ impl<'a> ApiClient<'a> {
         self.get_all_pages_of_paged_data(RESETS_URL).await
     }
 
-    pub async fn get_all_review_stats(&self) -> Result<Vec<Response<ReviewStatistic>>, ApiClientError> {
+    pub async fn get_all_review_stats(
+        &self,
+    ) -> Result<Vec<Response<ReviewStatistic>>, ApiClientError> {
         self.get_all_pages_of_paged_data(REVIEW_STATS_URL).await
     }
 
@@ -426,15 +460,24 @@ impl<'a> ApiClient<'a> {
 
         Ok(CompleteUserInfo {
             user: user_data,
-            review_stats: review_data.into_iter().map(|response| response.data).collect(),
-            assignments: assignment_data.into_iter().map(|response| response.data).collect(),
-            resets: reset_data.into_iter().map(|response| response.data).collect(),
+            review_stats: review_data
+                .into_iter()
+                .map(|response| response.data)
+                .collect(),
+            assignments: assignment_data
+                .into_iter()
+                .map(|response| response.data)
+                .collect(),
+            resets: reset_data
+                .into_iter()
+                .map(|response| response.data)
+                .collect(),
             id_to_subjects: hashy,
         })
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SubjectWithType {
     subject: Subject,
     subject_type: SubjectType,
@@ -447,37 +490,4 @@ impl SubjectWithType {
             subject_type,
         }
     }
-}
-
-#[allow(unused)]
-async fn test_api<T>(
-    url: &str,
-    token: &str,
-    client: &reqwest::Client,
-) -> Result<(), Box<dyn std::error::Error>>
-where
-    T: DeserializeOwned + fmt::Debug,
-{
-    let response = client
-        .get(url)
-        .header("Authorization", format!("Bearer {}", token))
-        .send()
-        .await?;
-
-    match response.status() {
-        reqwest::StatusCode::OK => match response.json::<T>().await {
-            Ok(parsed) => {
-                println!("Parsed User: {:?}", parsed);
-            }
-            Err(e) => println!("Error processing user {}", e),
-        },
-        reqwest::StatusCode::UNAUTHORIZED => {
-            println!("Invalid Token")
-        }
-        other => {
-            panic!("{:?}", other)
-        }
-    }
-
-    Ok(())
 }
