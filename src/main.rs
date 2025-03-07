@@ -1,15 +1,21 @@
+use axum::{
+    extract::State,
+    http::StatusCode,
+    response::{AppendHeaders, Html, IntoResponse, Redirect, Response},
+    routing::{get, post},
+    Form, Router,
+};
+use axum_extra::extract::cookie::{Cookie, CookieJar};
 use governor::{Quota, RateLimiter};
+use moka::future::Cache;
 use nonzero_ext::*;
 use serde::Deserialize;
-use std::{collections::HashMap, sync::{Arc, RwLock}};
-use wanikani_stats::data_processing::api_client::{ApiClient, CompleteUserInfo};
-use moka::future::Cache;
-use axum::{
-    extract::State, http::StatusCode, response::{AppendHeaders, Html, IntoResponse, Redirect, Response}, Form, Router, routing::{get, post}
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
 };
 use uuid::Uuid;
-use axum_extra::extract::cookie::{ Cookie, CookieJar };
-
+use wanikani_stats::data_processing::api_client::{ApiClient, CompleteUserInfo};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 struct UserToken {
@@ -36,19 +42,33 @@ impl AppState {
 }
 
 #[axum::debug_handler]
-async fn post_login(jar: CookieJar, State(state): State<AppState>, Form(wk_token_form): Form<TokenForm>) -> Result<(CookieJar, Redirect), StatusCode> {
+async fn post_login(
+    jar: CookieJar,
+    State(state): State<AppState>,
+    Form(wk_token_form): Form<TokenForm>,
+) -> Result<(CookieJar, Redirect), StatusCode> {
     let user_uuid = Uuid::new_v4().to_string();
-    let user_token = UserToken { token: wk_token_form.wk_token };
-    state.cookie_to_token.write().unwrap().insert(user_uuid.clone(), user_token);
-    Ok((jar.add(Cookie::new("user_uuid", user_uuid)), Redirect::to("/info")))
+    let user_token = UserToken {
+        token: wk_token_form.wk_token,
+    };
+    state
+        .cookie_to_token
+        .write()
+        .unwrap()
+        .insert(user_uuid.clone(), user_token);
+    Ok((
+        jar.add(Cookie::new("user_uuid", user_uuid)),
+        Redirect::to("/info"),
+    ))
 }
 
 async fn get_login(jar: CookieJar) -> Response {
     if let Some(_) = jar.get("user_uuid") {
-        return Redirect::to("/info").into_response()
+        return Redirect::to("/info").into_response();
     }
 
-    Html("<!DOCTYPE html> \
+    Html(
+        "<!DOCTYPE html> \
 <html lang=\"en\">
 <head>
     <meta charset=\"UTF-8\">
@@ -63,7 +83,9 @@ async fn get_login(jar: CookieJar) -> Response {
         <button type=\"submit\">Submit</button>
     </form>
 </body>
-</html>").into_response()
+</html>",
+    )
+    .into_response()
 }
 
 async fn get_info(jar: CookieJar, State(state): State<AppState>) -> Response {
@@ -71,9 +93,14 @@ async fn get_info(jar: CookieJar, State(state): State<AppState>) -> Response {
         let state = state.cookie_to_token.read().unwrap();
         let user_token = state.get(user_uuid.value());
 
-        return Html(format!("
+        return Html(format!(
+            "
         <p>uuid: {:?} token: {:?}</p>
-        ", user_uuid.value(), user_token.unwrap())).into_response()
+        ",
+            user_uuid.value(),
+            user_token.unwrap()
+        ))
+        .into_response();
     }
 
     StatusCode::UNAUTHORIZED.into_response()
@@ -86,8 +113,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         user_info_cache: Cache::new(1000),
         rate_limiter: Arc::new(RateLimiter::direct_with_clock(
             Quota::per_minute(nonzero!(10u32)),
-            governor::clock::DefaultClock::default())),
-        reqwest_client: reqwest::Client::new()
+            governor::clock::DefaultClock::default(),
+        )),
+        reqwest_client: reqwest::Client::new(),
     };
 
     let app = Router::new()
