@@ -16,6 +16,7 @@ use std::{
 };
 use uuid::Uuid;
 use wanikani_stats::data_processing::api_client::{ApiClient, CompleteUserInfo};
+use minijinja::{context, Environment};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 struct UserToken {
@@ -33,6 +34,7 @@ struct AppState {
     user_info_cache: Cache<UserToken, CompleteUserInfo>,
     rate_limiter: Arc<governor::DefaultDirectRateLimiter>,
     reqwest_client: reqwest::Client,
+    env: Environment<'static>
 }
 
 impl AppState {
@@ -62,30 +64,18 @@ async fn post_login(
     ))
 }
 
-async fn get_login(jar: CookieJar) -> Response {
+async fn get_login(jar: CookieJar, State(state): State<AppState>) -> Response {
     if let Some(_) = jar.get("user_uuid") {
         return Redirect::to("/info").into_response();
     }
 
-    Html(
-        "<!DOCTYPE html> \
-<html lang=\"en\">
-<head>
-    <meta charset=\"UTF-8\">
-    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
-    <title>WaniKani Login</title>
-</head>
-<body>
-    <h1>Enter Your WaniKani API Token</h1>
-    <form action=\"/login\" method=\"post\">
-        <label for=\"api_token\">WaniKani API Token:</label>
-        <input type=\"text\" id=\"api_token\" name=\"wk_token\" required>
-        <button type=\"submit\">Submit</button>
-    </form>
-</body>
-</html>",
-    )
-    .into_response()
+    let template = state.env.get_template("login").unwrap();
+
+    let rendered = template
+        .render(context! {})
+        .unwrap();
+
+    Html(rendered).into_response()
 }
 
 async fn get_info(jar: CookieJar, State(state): State<AppState>) -> Response {
@@ -108,6 +98,16 @@ async fn get_info(jar: CookieJar, State(state): State<AppState>) -> Response {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut env = Environment::new();
+
+    env.add_template("base", include_str!("../templates/base.jinja"))
+        .unwrap();
+
+    env.add_template("login", include_str!("../templates/login.jinja"))
+        .unwrap();
+
+    
+
     let shared_state = AppState {
         cookie_to_token: Arc::new(RwLock::new(HashMap::new())),
         user_info_cache: Cache::new(1000),
@@ -116,6 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             governor::clock::DefaultClock::default(),
         )),
         reqwest_client: reqwest::Client::new(),
+        env: env,
     };
 
     let app = Router::new()

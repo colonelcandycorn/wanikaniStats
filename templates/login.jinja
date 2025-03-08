@@ -1,0 +1,12 @@
+{% extends "base" %}
+
+{% block title %}Log In{% endblock title %}
+
+{% block content%}
+    <h1>Enter Your WaniKani API Token</h1>
+    <form action="/login" method="post">
+        <label for="api_token">WaniKani API Token:</label>
+        <input type="text" id="api_token" name="wk_token" required>
+        <button type="submit">Submit</button>
+    </form>
+{% endblock content %}
