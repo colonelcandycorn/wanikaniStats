@@ -1,0 +1,74 @@
+{% extends "base" %}
+
+{% block title %}Your Wanikani Stats{% endblock %}
+
+{% block content %}
+<ul>
+    <li>User: {{ username }}</li>
+    <li>Level: {{ level }}</li>
+    <li>Started At: {{ started_date }} </li>
+    <li>Number of Resets: {{ reset_count }}</li>
+    <li>Most Recent Reset: {{ reset_date }} ({{ reset_day_count }} days ago)</li>
+    <li>Kanji Learned: {{ kanji_learned }}</li>
+    <li>Vocabulary Learned: {{ vocab_learned }}</li>
+    <li>Radicals Learned: {{ radical_learned }}</li>
+</ul>
+<table>
+    <caption>Accuracy</caption>
+    <thead>
+        <tr>
+            <th scope="col"></th>
+            <th scope="col">Reading</th>
+            <th scope="col">Meaning</th>
+            <th scope="col">Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <th scope="row">Total Reviews:</th>
+            <td>{{ total_reading_count }}</td>
+            <td>{{ total_meaning_count }}</td>
+            <td>{{ total_review_count }}</td>
+        </tr>
+        <tr>
+            <th scope="row">Correct:</th>
+            <td>{{ total_correct_reading_count }}</td>
+            <td>{{ total_correct_meaning_count }}</td>
+            <td>{{ total_correct_count }}</td>
+        </tr>
+        <tr>
+            <th scope="row">Incorrect:</th>
+            <td>{{ total_incorrect_reading_count }}</td>
+            <td>{{ total_incorrect_meaning_count }}</td>
+            <td>{{ total_incorrect_count }}</td>
+        </tr>
+        <tr>
+            <th scope="row">Accuracy:</th>
+            <td>{{ reading_accuracy }}</td>
+            <td>{{ meaning_accuracy }}</td>
+            <td>{{ total_accuracy }}</td>
+        </tr>
+        <tr>
+            <th scope="row">Radicals:</th>
+            <td>--</td>
+            <td>{{ radical_meaning_accuracy }}</td>
+            <td>{{ radical_meaning_accuracy }}</td>
+        </tr>
+        <tr>
+            <th scope="row">Kanji:</th>
+            <td>{{ kanji_reading_accuracy }}</td>
+            <td>{{ kanji_meaning_accuracy }}</td>
+            <td>{{ kanji_total_accuracy }}</td>
+        </tr>
+        <tr>
+            <th scope="row">Vocabulary</th>
+            <td>{{ vocab_reading_accuracy }}</td>
+            <td>{{ vocab_meaning_accuracy }}</td>
+            <td>{{ vocab_total_accuracy }}</td>
+        </tr>
+        </tr>
+    </tbody>
+</table>
+
+
+{% endblock %}

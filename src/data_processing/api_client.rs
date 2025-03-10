@@ -45,11 +45,11 @@ impl error::Error for MissingSubjectError {}
 
 #[derive(Debug)]
 pub struct SubjectTypeStats {
-    subject_type: SubjectType,
-    num_of_meaning_correct: i32,
-    num_of_meaning_incorrect: i32,
-    num_of_reading_correct: i32,
-    num_of_reading_incorrect: i32,
+    pub subject_type: SubjectType,
+    pub num_of_meaning_correct: i32,
+    pub num_of_meaning_incorrect: i32,
+    pub num_of_reading_correct: i32,
+    pub num_of_reading_incorrect: i32,
 }
 
 impl CompleteUserInfo {
