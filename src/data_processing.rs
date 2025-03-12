@@ -10,8 +10,6 @@ use std::error;
 use std::fmt;
 use std::marker::PhantomData;
 
-
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct User {
     level: i32,

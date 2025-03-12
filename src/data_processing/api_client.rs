@@ -17,7 +17,6 @@ const ASSIGNMENT_URL: &str = "https://api.wanikani.com/v2/assignments";
 
 type ApiClientError = reqwest::Error;
 
-
 impl<'a> ApiClient<'a> {
     pub fn new(
         token: String,
@@ -209,7 +208,9 @@ impl<'a> ApiClient<'a> {
         self.get_all_pages_of_paged_data(REVIEW_STATS_URL).await
     }
 
-    pub async fn build_complete_user_info(&self) -> Result<CompleteUserInfo, Box<dyn std::error::Error>> {
+    pub async fn build_complete_user_info(
+        &self,
+    ) -> Result<CompleteUserInfo, Box<dyn std::error::Error>> {
         let user_data = self.get_user_data().await?;
         let review_data = self.get_all_review_stats().await?;
         let assignment_data = self.get_all_assignments().await?;

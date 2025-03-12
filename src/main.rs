@@ -15,9 +15,7 @@ use std::time::{Duration, Instant};
 use std::{collections::HashMap, ops::Sub, sync::Arc};
 use tokio::sync::RwLock;
 use uuid::Uuid;
-use wanikani_stats::data_processing::{
-    ApiClient, CompleteUserInfo, SubjectType, SubjectTypeStats,
-};
+use wanikani_stats::data_processing::{ApiClient, CompleteUserInfo, SubjectType, SubjectTypeStats};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 struct UserToken {
