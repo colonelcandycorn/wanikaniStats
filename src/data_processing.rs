@@ -3,9 +3,8 @@ pub mod complete_user_info;
 
 use chrono::{DateTime, Local};
 use governor::DefaultDirectRateLimiter;
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error;
 use std::fmt;
 use std::marker::PhantomData;
@@ -106,6 +105,7 @@ pub struct CompleteUserInfoBuilder {
 }
 
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub struct CompleteUserInfo {
     user: User,
     review_stats: Vec<ReviewStatistic>,
@@ -151,6 +151,7 @@ pub struct SubjectTypeStats {
 }
 
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub struct SubjectWithType {
     subject: Subject,
     subject_type: SubjectType,

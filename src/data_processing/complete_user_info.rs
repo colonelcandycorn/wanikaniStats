@@ -30,7 +30,7 @@ impl CompleteUserInfo {
     }
 
     pub fn get_vocab_learned(&self) -> i32 {
-        &self.kana_learned + &self.vocab_learned
+        self.kana_learned + self.vocab_learned
     }
 
     pub fn get_total_correct_reading_count(&self) -> i32 {
@@ -272,7 +272,6 @@ impl CompleteUserInfoBuilder {
     }
 }
 
-
 #[cfg(test)]
 mod test {
 
@@ -318,7 +317,7 @@ mod test {
     }
 
     /// Generates a static fake `Subject`
-    pub fn fake_subject(subject_id: i32, subject_type: &str) -> Subject {
+    pub fn fake_subject(subject_type: &str) -> Subject {
         Subject {
             characters: match subject_type {
                 "radical" => Some("一".to_string()),
@@ -363,7 +362,10 @@ mod test {
         let resets = vec![fake_reset()];
         let mut id_to_subjects = HashMap::new();
 
-        id_to_subjects.insert(1, SubjectWithType::new(fake_subject(1, "kanji"), SubjectType::Kanji));
+        id_to_subjects.insert(
+            1,
+            SubjectWithType::new(fake_subject("kanji"), SubjectType::Kanji),
+        );
 
         CompleteUserInfoBuilder::new(user, review_stats, assignments, resets, id_to_subjects)
     }
@@ -384,7 +386,10 @@ mod test {
 
         let non_passed_assignment = fake_non_passed_assignment(2);
         builder.assignments.push(non_passed_assignment);
-        builder.id_to_subjects.insert(2, SubjectWithType::new(fake_subject(2, "kanji"), SubjectType::Kanji));
+        builder.id_to_subjects.insert(
+            2,
+            SubjectWithType::new(fake_subject("kanji"), SubjectType::Kanji),
+        );
 
         let num_of_passed = builder.get_num_of_passed(SubjectType::Kanji).unwrap();
 
@@ -398,7 +403,10 @@ mod test {
 
         let passed_assignment = fake_assignment(2);
         builder.assignments.push(passed_assignment);
-        builder.id_to_subjects.insert(2, SubjectWithType::new(fake_subject(2, "radical"), SubjectType::Radical));
+        builder.id_to_subjects.insert(
+            2,
+            SubjectWithType::new(fake_subject("radical"), SubjectType::Radical),
+        );
 
         let num_of_passed = builder.get_num_of_passed(SubjectType::Kanji).unwrap();
         let num_of_passed_radical = builder.get_num_of_passed(SubjectType::Radical).unwrap();
@@ -429,7 +437,10 @@ mod test {
 
         let review_stat = fake_review_statistic(2, "kanji");
         builder.review_stats.push(review_stat);
-        builder.id_to_subjects.insert(2, SubjectWithType::new(fake_subject(2, "kanji"), SubjectType::Kanji));
+        builder.id_to_subjects.insert(
+            2,
+            SubjectWithType::new(fake_subject("kanji"), SubjectType::Kanji),
+        );
 
         let stats = builder.get_subject_type_stats(&subject).unwrap();
 
@@ -451,7 +462,9 @@ mod test {
         assert_eq!(user_info.get_kanji_learned(), 1);
         assert_eq!(user_info.get_radicals_learned(), 0);
         assert_eq!(user_info.get_vocab_learned(), 0);
-        assert_eq!(user_info.get_date_of_most_recent_reset(), Some(&Local.with_ymd_and_hms(2023, 10, 2, 12, 0, 0).unwrap()));
+        assert_eq!(
+            user_info.get_date_of_most_recent_reset(),
+            Some(&Local.with_ymd_and_hms(2023, 10, 2, 12, 0, 0).unwrap())
+        );
     }
-
 }

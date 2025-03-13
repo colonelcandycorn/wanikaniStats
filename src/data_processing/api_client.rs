@@ -1,9 +1,9 @@
+use super::*;
 use governor::DefaultDirectRateLimiter;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
-use super::*;
 
 const USER_URL: &str = "https://api.wanikani.com/v2/user";
 const RESETS_URL: &str = "https://api.wanikani.com/v2/resets";
@@ -31,9 +31,11 @@ impl<'a> ApiClient<'a> {
     where
         T: DeserializeOwned,
     {
-        Ok(self
+        let result = self
             .get_response_with_params::<T, String>(url, None)
-            .await?)
+            .await?;
+
+        Ok(result)
     }
 
     async fn get_response_with_params<T, K>(
@@ -99,9 +101,11 @@ impl<'a> ApiClient<'a> {
     where
         T: DeserializeOwned,
     {
-        Ok(self
+        let result = self
             .get_all_pages_of_paged_data_with_params::<T, String>(paged_url, None)
-            .await?)
+            .await?;
+
+        Ok(result)
     }
 
     pub async fn get_all_pages_of_paged_data_with_params<T, K>(
@@ -131,7 +135,7 @@ impl<'a> ApiClient<'a> {
         }) = processed.pages
         {
             self.limiter.until_ready().await;
-            let raw = self.get_response::<PagedData<T>>(&url).await?;
+            let raw = self.get_response::<PagedData<T>>(url).await?;
             processed = self.raw_response_to_data(raw).await?;
 
             result.append(&mut processed.data);
@@ -160,10 +164,10 @@ impl<'a> ApiClient<'a> {
 
     pub async fn construct_id_to_subject_hash(
         &self,
-        subject_list: &Vec<i32>,
+        subject_list: &[i32],
     ) -> Result<HashMap<i32, SubjectWithType>, ApiClientError> {
         let subject_list_strs: Vec<String> = subject_list
-            .into_iter()
+            .iter()
             .map(|subject| subject.to_string())
             .collect();
         let query_params = vec![("ids", subject_list_strs.join(","))];
@@ -243,5 +247,3 @@ impl SubjectWithType {
         }
     }
 }
-
-

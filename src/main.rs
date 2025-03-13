@@ -1,21 +1,21 @@
 use axum::{
     extract::State,
     http::StatusCode,
-    response::{AppendHeaders, Html, IntoResponse, Redirect, Response},
-    routing::{get, post},
+    response::{Html, IntoResponse, Redirect, Response},
+    routing::get,
     Form, Router,
 };
 use axum_extra::extract::cookie::{Cookie, CookieJar};
 use governor::{Quota, RateLimiter};
 use minijinja::{context, Environment};
-use moka::{future::Cache, Expiry};
+use moka::future::Cache;
 use nonzero_ext::*;
 use serde::Deserialize;
-use std::time::{Duration, Instant};
-use std::{collections::HashMap, ops::Sub, sync::Arc};
+use std::time::Duration;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use uuid::Uuid;
-use wanikani_stats::data_processing::{ApiClient, CompleteUserInfo, SubjectType, SubjectTypeStats};
+use wanikani_stats::data_processing::{ApiClient, CompleteUserInfo};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 struct UserToken {
@@ -48,8 +48,7 @@ impl AppState {
                 let reqwest_client = reqwest_client.clone();
                 let token = token.clone();
                 let api_client = ApiClient::new(token.token, &reqwest_client, &rate_limiter);
-                let user_info = api_client.build_complete_user_info().await.unwrap();
-                user_info
+                api_client.build_complete_user_info().await.unwrap()
             })
             .await;
 
@@ -79,7 +78,7 @@ async fn post_login(
 }
 
 async fn get_login(jar: CookieJar, State(state): State<AppState>) -> Response {
-    if let Some(_) = jar.get("user_uuid") {
+    if jar.get("user_uuid").is_some() {
         return Redirect::to("/info").into_response();
     }
 
@@ -205,7 +204,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             governor::clock::DefaultClock::default(),
         )),
         reqwest_client: reqwest::Client::new(),
-        env: env,
+        env,
     };
 
     let app = Router::new()
