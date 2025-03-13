@@ -10,7 +10,7 @@ use std::error;
 use std::fmt;
 use std::marker::PhantomData;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct User {
     level: i32,
     username: String,

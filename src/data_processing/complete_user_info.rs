@@ -186,14 +186,14 @@ impl CompleteUserInfoBuilder {
     }
 
     pub fn build(self) -> Result<CompleteUserInfo, MissingSubjectError> {
-        let kanji_stats = self.get_subject_type_stats(SubjectType::Kanji).unwrap();
+        let kanji_stats = self.get_subject_type_stats(&SubjectType::Kanji).unwrap();
         let vocab_stats = self
-            .get_subject_type_stats(SubjectType::Vocabulary)
+            .get_subject_type_stats(&SubjectType::Vocabulary)
             .unwrap();
         let kana_stats = self
-            .get_subject_type_stats(SubjectType::KanaVocabulary)
+            .get_subject_type_stats(&SubjectType::KanaVocabulary)
             .unwrap();
-        let radical_stats = self.get_subject_type_stats(SubjectType::Radical).unwrap();
+        let radical_stats = self.get_subject_type_stats(&SubjectType::Radical).unwrap();
         let kanji_learned = self.get_num_of_passed(SubjectType::Kanji).unwrap();
         let radicals_learned = self.get_num_of_passed(SubjectType::Radical).unwrap();
         let vocab_learned = self.get_num_of_passed(SubjectType::Vocabulary).unwrap();
@@ -238,7 +238,7 @@ impl CompleteUserInfoBuilder {
 
     pub fn get_subject_type_stats(
         &self,
-        subject: SubjectType,
+        subject: &SubjectType,
     ) -> Result<SubjectTypeStats, MissingSubjectError> {
         let mut meaning_correct = 0;
         let mut meaning_incorrect = 0;
@@ -254,7 +254,7 @@ impl CompleteUserInfoBuilder {
 
             let subject_type = &subject_obj.unwrap().subject_type;
 
-            if *subject_type == subject {
+            if subject_type == subject {
                 meaning_correct += review_stat.meaning_correct;
                 meaning_incorrect += review_stat.meaning_incorrect;
                 reading_correct += review_stat.reading_correct;
@@ -263,11 +263,195 @@ impl CompleteUserInfoBuilder {
         }
 
         Ok(SubjectTypeStats {
-            subject_type: subject,
+            subject_type: subject.clone(),
             num_of_meaning_correct: meaning_correct,
             num_of_meaning_incorrect: meaning_incorrect,
             num_of_reading_correct: reading_correct,
             num_of_reading_incorrect: reading_incorrect,
         })
     }
+}
+
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    use chrono::{Local, TimeZone};
+
+    /// Generates a static fake `ReviewStatistic`
+    pub fn fake_review_statistic(subject_id: i32, subject_type: &str) -> ReviewStatistic {
+        ReviewStatistic {
+            created_at: Local.with_ymd_and_hms(2023, 10, 1, 12, 0, 0).unwrap(),
+            meaning_correct: 50,
+            meaning_current_streak: 5,
+            meaning_incorrect: 10,
+            meaning_max_streak: 10,
+            percentage_correct: 80,
+            reading_correct: 40,
+            reading_current_streak: 3,
+            reading_incorrect: 5,
+            reading_max_streak: 8,
+            subject_id,
+            subject_type: subject_type.to_string(),
+        }
+    }
+
+    /// Generates a static fake `Assignment`
+    pub fn fake_assignment(subject_id: i32) -> Assignment {
+        Assignment {
+            created_at: Some(Local.with_ymd_and_hms(2023, 10, 1, 12, 0, 0).unwrap()),
+            passed_at: Some(Local.with_ymd_and_hms(2023, 10, 2, 12, 0, 0).unwrap()),
+            srs_stage: 5,
+            subject_id,
+        }
+    }
+
+    pub fn fake_non_passed_assignment(subject_id: i32) -> Assignment {
+        Assignment {
+            created_at: Some(Local.with_ymd_and_hms(2023, 10, 1, 12, 0, 0).unwrap()),
+            passed_at: None,
+            srs_stage: 5,
+            subject_id,
+        }
+    }
+
+    /// Generates a static fake `Subject`
+    pub fn fake_subject(subject_id: i32, subject_type: &str) -> Subject {
+        Subject {
+            characters: match subject_type {
+                "radical" => Some("一".to_string()),
+                "kanji" => Some("日".to_string()),
+                "vocabulary" => Some("食べる".to_string()),
+                "kana_vocabulary" => Some("たべる".to_string()),
+                _ => None,
+            },
+            level: 5,
+            spaced_repetition_system_id: 1,
+            meanings: vec![
+                Meanings {
+                    meaning: Some("one".to_string()),
+                    primary: true,
+                },
+                Meanings {
+                    meaning: Some("first".to_string()),
+                    primary: false,
+                },
+            ],
+        }
+    }
+
+    /// Generates a static fake `Reset`
+    pub fn fake_reset() -> Reset {
+        Reset {
+            created_at: Local.with_ymd_and_hms(2023, 10, 1, 12, 0, 0).unwrap(),
+            confirmed_at: Local.with_ymd_and_hms(2023, 10, 2, 12, 0, 0).unwrap(),
+            original_level: 10,
+            target_level: 5,
+        }
+    }
+
+    fn setup_builder() -> CompleteUserInfoBuilder {
+        let user = User {
+            username: "test".to_string(),
+            level: 1,
+            started_at: Local::now(),
+        };
+        let review_stats = vec![fake_review_statistic(1, "kanji")];
+        let assignments = vec![fake_assignment(1)];
+        let resets = vec![fake_reset()];
+        let mut id_to_subjects = HashMap::new();
+
+        id_to_subjects.insert(1, SubjectWithType::new(fake_subject(1, "kanji"), SubjectType::Kanji));
+
+        CompleteUserInfoBuilder::new(user, review_stats, assignments, resets, id_to_subjects)
+    }
+
+    #[test]
+    fn test_get_num_of_passed() {
+        let builder = setup_builder();
+        let subject = SubjectType::Kanji;
+
+        let num_of_passed_kanji = builder.get_num_of_passed(subject).unwrap();
+
+        assert_eq!(num_of_passed_kanji, 1);
+    }
+
+    #[test]
+    fn test_non_passed_subject_type() {
+        let mut builder = setup_builder();
+
+        let non_passed_assignment = fake_non_passed_assignment(2);
+        builder.assignments.push(non_passed_assignment);
+        builder.id_to_subjects.insert(2, SubjectWithType::new(fake_subject(2, "kanji"), SubjectType::Kanji));
+
+        let num_of_passed = builder.get_num_of_passed(SubjectType::Kanji).unwrap();
+
+        assert!(builder.assignments.len() > 1);
+        assert_eq!(num_of_passed, 1);
+    }
+
+    #[test]
+    fn test_different_subject_type_does_not_affect_count() {
+        let mut builder = setup_builder();
+
+        let passed_assignment = fake_assignment(2);
+        builder.assignments.push(passed_assignment);
+        builder.id_to_subjects.insert(2, SubjectWithType::new(fake_subject(2, "radical"), SubjectType::Radical));
+
+        let num_of_passed = builder.get_num_of_passed(SubjectType::Kanji).unwrap();
+        let num_of_passed_radical = builder.get_num_of_passed(SubjectType::Radical).unwrap();
+
+        assert!(builder.assignments.len() > 1);
+        assert_eq!(num_of_passed, 1);
+        assert_eq!(num_of_passed_radical, 1);
+    }
+
+    #[test]
+    fn test_get_subject_type_stats() {
+        let builder = setup_builder();
+        let subject = SubjectType::Kanji;
+
+        let stats = builder.get_subject_type_stats(&subject).unwrap();
+
+        assert_eq!(stats.subject_type, subject);
+        assert_eq!(stats.num_of_meaning_correct, 50);
+        assert_eq!(stats.num_of_meaning_incorrect, 10);
+        assert_eq!(stats.num_of_reading_correct, 40);
+        assert_eq!(stats.num_of_reading_incorrect, 5);
+    }
+
+    #[test]
+    fn test_insert_review_statistic_and_get_subject_type_stats() {
+        let mut builder = setup_builder();
+        let subject = SubjectType::Kanji;
+
+        let review_stat = fake_review_statistic(2, "kanji");
+        builder.review_stats.push(review_stat);
+        builder.id_to_subjects.insert(2, SubjectWithType::new(fake_subject(2, "kanji"), SubjectType::Kanji));
+
+        let stats = builder.get_subject_type_stats(&subject).unwrap();
+
+        assert_eq!(stats.subject_type, subject);
+        assert_eq!(stats.num_of_meaning_correct, 100);
+        assert_eq!(stats.num_of_meaning_incorrect, 20);
+        assert_eq!(stats.num_of_reading_correct, 80);
+        assert_eq!(stats.num_of_reading_incorrect, 10);
+    }
+
+    #[test]
+    fn test_get_basic_info() {
+        let builder = setup_builder();
+        let user_info = builder.build().unwrap();
+
+        assert_eq!(user_info.get_user_name(), "test");
+        assert_eq!(user_info.get_level(), 1);
+        assert_eq!(user_info.get_num_of_resets(), 1);
+        assert_eq!(user_info.get_kanji_learned(), 1);
+        assert_eq!(user_info.get_radicals_learned(), 0);
+        assert_eq!(user_info.get_vocab_learned(), 0);
+        assert_eq!(user_info.get_date_of_most_recent_reset(), Some(&Local.with_ymd_and_hms(2023, 10, 2, 12, 0, 0).unwrap()));
+    }
+
 }

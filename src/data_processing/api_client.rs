@@ -1,12 +1,8 @@
-use chrono::{DateTime, Local};
 use governor::DefaultDirectRateLimiter;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::{HashMap, HashSet};
-use std::error;
-use std::fmt;
 use std::marker::PhantomData;
-
 use super::*;
 
 const USER_URL: &str = "https://api.wanikani.com/v2/user";
@@ -247,3 +243,5 @@ impl SubjectWithType {
         }
     }
 }
+
+
