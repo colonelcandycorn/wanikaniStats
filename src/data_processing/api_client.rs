@@ -76,25 +76,14 @@ impl<'a> ApiClient<'a> {
         Ok(parsed)
     }
 
-    pub async fn get_user_data(&self) -> Result<User, ApiClientError> {
+    async fn get_user_data(&self) -> Result<User, ApiClientError> {
         let raw = self.get_response::<Response<User>>(USER_URL).await?;
         let processed = self.raw_response_to_data(raw).await?;
 
         Ok(processed.data)
     }
 
-    pub async fn get_non_paginated_data<T>(&self, url: &str) -> Result<Response<T>, ApiClientError>
-    where
-        T: DeserializeOwned,
-    {
-        self.limiter.until_ready().await;
-        let raw = self.get_response::<Response<T>>(url).await?;
-        let processed = self.raw_response_to_data(raw).await?;
-
-        Ok(processed)
-    }
-
-    pub async fn get_all_pages_of_paged_data<T>(
+    async fn get_all_pages_of_paged_data<T>(
         &self,
         paged_url: &str,
     ) -> Result<Vec<Response<T>>, ApiClientError>
@@ -108,7 +97,7 @@ impl<'a> ApiClient<'a> {
         Ok(result)
     }
 
-    pub async fn get_all_pages_of_paged_data_with_params<T, K>(
+    async fn get_all_pages_of_paged_data_with_params<T, K>(
         &self,
         paged_url: &str,
         params: Option<Vec<(&str, K)>>,
@@ -144,7 +133,7 @@ impl<'a> ApiClient<'a> {
         Ok(result)
     }
 
-    pub fn get_list_of_subjects_to_request(
+    fn get_list_of_subjects_to_request(
         &self,
         review_stats: &Vec<Response<ReviewStatistic>>,
         assignment_stats: &Vec<Response<Assignment>>,
@@ -162,7 +151,7 @@ impl<'a> ApiClient<'a> {
         result.into_iter().collect()
     }
 
-    pub async fn construct_id_to_subject_hash(
+    async fn construct_id_to_subject_hash(
         &self,
         subject_list: &[i32],
     ) -> Result<HashMap<i32, SubjectWithType>, ApiClientError> {
@@ -194,17 +183,15 @@ impl<'a> ApiClient<'a> {
         Ok(result)
     }
 
-    pub async fn get_all_assignments(&self) -> Result<Vec<Response<Assignment>>, ApiClientError> {
+    async fn get_all_assignments(&self) -> Result<Vec<Response<Assignment>>, ApiClientError> {
         self.get_all_pages_of_paged_data(ASSIGNMENT_URL).await
     }
 
-    pub async fn get_all_resets(&self) -> Result<Vec<Response<Reset>>, ApiClientError> {
+    async fn get_all_resets(&self) -> Result<Vec<Response<Reset>>, ApiClientError> {
         self.get_all_pages_of_paged_data(RESETS_URL).await
     }
 
-    pub async fn get_all_review_stats(
-        &self,
-    ) -> Result<Vec<Response<ReviewStatistic>>, ApiClientError> {
+    async fn get_all_review_stats(&self) -> Result<Vec<Response<ReviewStatistic>>, ApiClientError> {
         self.get_all_pages_of_paged_data(REVIEW_STATS_URL).await
     }
 

@@ -216,7 +216,7 @@ impl CompleteUserInfoBuilder {
         })
     }
 
-    pub fn get_num_of_passed(&self, subject: SubjectType) -> Result<i32, MissingSubjectError> {
+    fn get_num_of_passed(&self, subject: SubjectType) -> Result<i32, MissingSubjectError> {
         let mut result = 0;
 
         for assignment in &self.assignments {
@@ -236,7 +236,7 @@ impl CompleteUserInfoBuilder {
         Ok(result)
     }
 
-    pub fn get_subject_type_stats(
+    fn get_subject_type_stats(
         &self,
         subject: &SubjectType,
     ) -> Result<SubjectTypeStats, MissingSubjectError> {

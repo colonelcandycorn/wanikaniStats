@@ -10,21 +10,21 @@ use std::fmt;
 use std::marker::PhantomData;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
-pub struct User {
+struct User {
     level: i32,
     username: String,
     started_at: DateTime<Local>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct PageData {
+struct PageData {
     per_page: i32,
     next_url: Option<String>,
     previous_url: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct ReviewStatistic {
+struct ReviewStatistic {
     created_at: DateTime<Local>,
     meaning_correct: i32,
     meaning_current_streak: i32,
@@ -40,13 +40,13 @@ pub struct ReviewStatistic {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Meanings {
+struct Meanings {
     meaning: Option<String>,
     primary: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Subject {
+struct Subject {
     characters: Option<String>,
     level: i32,
     spaced_repetition_system_id: i32,
@@ -54,7 +54,7 @@ pub struct Subject {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Assignment {
+struct Assignment {
     created_at: Option<DateTime<Local>>,
     passed_at: Option<DateTime<Local>>,
     srs_stage: i32,
@@ -62,7 +62,7 @@ pub struct Assignment {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Reset {
+struct Reset {
     created_at: DateTime<Local>,
     confirmed_at: DateTime<Local>,
     original_level: i32,
@@ -70,20 +70,20 @@ pub struct Reset {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct PagedData<T> {
+struct PagedData<T> {
     pages: Option<PageData>,
     total_count: i32,
     data: Vec<Response<T>>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct Response<T> {
+struct Response<T> {
     id: Option<i32>,
     object: String,
     data: T,
 }
 
-pub struct ReqwestResponse<T> {
+struct ReqwestResponse<T> {
     raw_response: reqwest::Response,
     resource_type: PhantomData<T>,
 }
@@ -96,7 +96,7 @@ pub struct ApiClient<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct CompleteUserInfoBuilder {
+struct CompleteUserInfoBuilder {
     user: User,
     review_stats: Vec<ReviewStatistic>,
     assignments: Vec<Assignment>,
@@ -123,7 +123,7 @@ pub struct CompleteUserInfo {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum SubjectType {
+enum SubjectType {
     KanaVocabulary,
     Kanji,
     Radical,
@@ -142,7 +142,8 @@ impl fmt::Display for MissingSubjectError {
 impl error::Error for MissingSubjectError {}
 
 #[derive(Debug, Clone)]
-pub struct SubjectTypeStats {
+#[allow(unused)]
+struct SubjectTypeStats {
     pub subject_type: SubjectType,
     pub num_of_meaning_correct: i32,
     pub num_of_meaning_incorrect: i32,
@@ -152,7 +153,7 @@ pub struct SubjectTypeStats {
 
 #[derive(Debug, Clone)]
 #[allow(unused)]
-pub struct SubjectWithType {
+struct SubjectWithType {
     subject: Subject,
     subject_type: SubjectType,
 }
