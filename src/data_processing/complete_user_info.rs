@@ -169,6 +169,13 @@ impl CompleteUserInfo {
 }
 
 impl CompleteUserInfoBuilder {
+    /// Creates a new `CompleteUserInfoBuilder`. Realistically, I think it would be better
+    /// for this to have no parameters and instead have methods to add the data. This would
+    /// allow for more flexibility in the future. I mostly did this because I was trying to
+    /// find the easiest way to add in the stats and other calculated fields.
+    ///
+    /// I also don't like that this is public because it is only used in the `ApiClient` struct, but
+    /// because that struct is in a different module, I had to make this public.
     pub fn new(
         user: User,
         review_stats: Vec<ReviewStatistic>,
@@ -185,6 +192,8 @@ impl CompleteUserInfoBuilder {
         }
     }
 
+    /// This method mostly just exists to do all the calculations and return the `CompleteUserInfo`
+    /// struct. So realistically, you just call new, add all the data, and then call this method.
     pub fn build(self) -> Result<CompleteUserInfo, MissingSubjectError> {
         let kanji_stats = self.get_subject_type_stats(&SubjectType::Kanji).unwrap();
         let vocab_stats = self

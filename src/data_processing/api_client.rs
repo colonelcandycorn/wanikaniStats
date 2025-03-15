@@ -14,6 +14,13 @@ const ASSIGNMENT_URL: &str = "https://api.wanikani.com/v2/assignments";
 type ApiClientError = reqwest::Error;
 
 impl<'a> ApiClient<'a> {
+    /// This is the constructor for the `ApiClient` struct. This struct is used to interact with the
+    /// WaniKani API. You need to provide a WaniKani API token, a reference to a `reqwest::Client`, and
+    /// a reference to a `DefaultDirectRateLimiter`. The `reqwest::Client` is used to make the requests
+    /// to the API and the `DefaultDirectRateLimiter` is used to rate limit the requests to the API. Wanikani
+    /// has a rate limit of 60 requests per minute. I am not sure if this is the best way to handle the
+    /// rate limiting. As it seems kind of silly that a website would have a rate limit that is so low for
+    /// every single user.
     pub fn new(
         token: String,
         client: &'a reqwest::Client, // change to arc
@@ -195,6 +202,12 @@ impl<'a> ApiClient<'a> {
         self.get_all_pages_of_paged_data(REVIEW_STATS_URL).await
     }
 
+    /// This is one of the few methods that actually needs to be called outside of the data_processing
+    /// module. This method is used to build the complete user info struct. This struct is used to
+    /// output all the aggregated data that was gathered from the API.
+    ///
+    /// This accepts no arguments and returns a `Result` that contains either a `CompleteUserInfo`
+    /// struct or a `Box<dyn std::error::Error>`.
     pub async fn build_complete_user_info(
         &self,
     ) -> Result<CompleteUserInfo, Box<dyn std::error::Error>> {
@@ -227,6 +240,11 @@ impl<'a> ApiClient<'a> {
 }
 
 impl SubjectWithType {
+    /// This is used by the `CompleteUserInfoBuilder` to create a new `SubjectWithType`
+    /// struct. This is used to store the subject data along with the type of subject
+    /// that it is. This is useful for calculating the stats for each specific type. In the future,
+    /// I want to use the subject data to provide specific information about each subject to the user.
+    /// Right now, I just present aggregate data.
     pub fn new(subject: Subject, subject_type: SubjectType) -> Self {
         SubjectWithType {
             subject,

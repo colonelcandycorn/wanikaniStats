@@ -88,6 +88,10 @@ struct ReqwestResponse<T> {
     resource_type: PhantomData<T>,
 }
 
+/// This is the main struct that will be used to interact with the WaniKani API.
+/// You really just need to create an instance of this struct and then call the
+/// `build_complete_user_info` method. This will return a `CompleteUserInfo` struct that will
+/// contain all the information that you need.
 #[derive(Debug)]
 pub struct ApiClient<'a> {
     token: String,
@@ -104,6 +108,14 @@ struct CompleteUserInfoBuilder {
     id_to_subjects: HashMap<i32, SubjectWithType>,
 }
 
+/// This is the most important struct in the project. As the entire purpose of this
+/// project is really just to get this information and present it to the user. This will
+/// contain all the information that was gathered from the API. This struct is also
+/// responsible for calculating the stats for each type of subject. The main thing that
+/// I am dissatisfied with is the fact that the `id_to_subjects` field  contains the actual
+/// subject data. This is because this information is not specific to the user and could
+/// be used for other users. Ideally, this would be a borrowed reference to the subject
+/// data that would be stored somewhere else.
 #[derive(Debug, Clone)]
 #[allow(unused)]
 pub struct CompleteUserInfo {
@@ -130,6 +142,9 @@ enum SubjectType {
     Vocabulary,
 }
 
+/// This is a custom error type that would really only occur if the API response
+/// was not what was expected. This is a very unlikely error to occur and if it
+/// does, then that would be on WaniKani's end.
 #[derive(Debug)]
 pub struct MissingSubjectError;
 
@@ -141,6 +156,10 @@ impl fmt::Display for MissingSubjectError {
 
 impl error::Error for MissingSubjectError {}
 
+/// This is one of the only structs that has every field public. This is because
+/// the fields are basically exactly what goes into the templates. This is reliant
+/// on the enum `SubjectType` to determine what type of subject it is. So there will
+/// be four of these structs in the `CompleteUserInfo` struct.
 #[derive(Debug, Clone)]
 #[allow(unused)]
 struct SubjectTypeStats {
