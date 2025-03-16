@@ -27,6 +27,11 @@ struct TokenForm {
     wk_token: String,
 }
 
+/// AppState
+/// 
+/// When I got to this point, I started to realize some of my limited understanding of Backend development. I am not sure if this is the best way to handle storing user information to 
+/// prevent the user from having to login every time they visit the site. The cache seems fine but I'd like for there to be a way for the user to force a refresh of their data. I am also relatively
+/// new to understanding the implications of async programming so I don't know if I am using ARC and RwLock correctly.
 #[derive(Clone)]
 struct AppState {
     cookie_to_token: Arc<RwLock<HashMap<String, UserToken>>>,
@@ -56,6 +61,11 @@ impl AppState {
     }
 }
 
+/// /login POST
+/// 
+/// This is a pretty simple function that will accept some user input from the login form, generate a cookie, and then redirect the user to the /info page.
+/// The main problem is that validation will happen after the redirect, and I am not sure if that is the best way to handle this. You can give this a bogus
+/// API token, but the /info page will call the API, receive an error, and then redirect back to the /login page.
 #[axum::debug_handler]
 async fn post_login(
     jar: CookieJar,
@@ -77,6 +87,11 @@ async fn post_login(
     ))
 }
 
+/// /login GET
+/// 
+/// This just presents the login form to the user. It first checks if the user has a cookie with a user_uuid. If they do, then they are redirected to the /info page.
+/// The /info page will check if the uuid cookie is valid and then display the user's information. If the user does not have a cookie, then they are presented with the login form.
+/// 
 async fn get_login(jar: CookieJar, State(state): State<AppState>) -> Response {
     if jar.get("user_uuid").is_some() {
         return Redirect::to("/info").into_response();
@@ -89,6 +104,11 @@ async fn get_login(jar: CookieJar, State(state): State<AppState>) -> Response {
     Html(rendered).into_response()
 }
 
+/// /info GET
+/// 
+/// This has the most logic to it. Partly because of all the semantics of whether the user has a cookie, whether the cookie has a valid token, and whether the token has actually associated with
+/// a wanikani account. If all of these conditions are met, we first check if our cache has the user info. If it does, we display the user info. If it does not, we call the wanikani API to get the user info.
+/// If the token is invalid, we remove the cookie and redirect to the login page. If the user has no cookie, we redirect to the login page. If the user has a cookie but no token, we remove the cookie and redirect to the login page.
 #[axum::debug_handler]
 async fn get_info(jar: CookieJar, State(state): State<AppState>) -> Response {
     if let Some(user_uuid) = jar.get("user_uuid") {
