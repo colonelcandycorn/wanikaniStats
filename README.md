@@ -47,6 +47,7 @@ Start the web server with:
 ```sh
 cargo run
 ```
+By default it will be at 0.0.0.0:3000
 
 ## Example
 
