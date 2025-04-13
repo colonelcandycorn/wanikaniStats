@@ -159,6 +159,7 @@ async fn get_info(jar: CookieJar, State(state): State<AppState>) -> Response {
                     vocab_reading_accuracy => format!("{:.2}",user_info.get_vocab_reading_accuracy()),
                     vocab_meaning_accuracy => format!("{:.2}",user_info.get_vocab_meaning_accuracy()),
                     vocab_total_accuracy => format!("{:.2}",user_info.get_vocab_total_accuracy()),
+                    subjects => user_info.get_subjects_with_stats(),
                 };
 
                 let rendered = template.render(context).unwrap();

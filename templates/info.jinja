@@ -69,6 +69,18 @@
         </tr>
     </tbody>
 </table>
+<ul>
+    {% for subject in subjects %}
+    <li>
+        <strong>{{ subject['characters'] }}</strong><br>
+        <strong>Reading:</strong> {{ subject['primary_meaning'] }}<br>
+        <strong>Meaning Correct</strong> {{ subject['meaning_correct'] }}<br>
+        <strong>Meaning Incorrect</strong> {{ subject['meaning_incorrect'] }}<br>
+        <strong>Reading Correct</strong> {{ subject['reading_correct'] }}<br>
+        <strong>Reading Incorrect</strong> {{ subject['reading_incorrect'] }}<br>
+    </li>
+    {% endfor %}
+</ul>
 
 
 {% endblock %}

@@ -1,4 +1,5 @@
 use super::*;
+use std::borrow;
 
 impl CompleteUserInfo {
     pub fn get_user_name(&self) -> &str {
@@ -165,6 +166,44 @@ impl CompleteUserInfo {
             + self.kana_stats.num_of_reading_correct) as f64;
 
         (vocab_correct / vocab_count) * 100.0
+    }
+
+    pub fn get_subjects_with_stats(&self) -> Vec<SubjectWithStats> {
+        let mut subjects_with_stats = Vec::new();
+
+        for review_stat in &self.review_stats {
+            let Some(subject_with_type) = self.id_to_subjects.get(&review_stat.subject_id) else {
+                continue;
+            };
+
+            for meaning in &subject_with_type.subject.meanings {
+                if !meaning.primary {
+                    continue
+                }
+
+                let characters_cow = match subject_with_type.subject.characters.as_deref() {
+                    Some(s) => borrow::Cow::from(s),
+                    None => borrow::Cow::from("Missing Characters".to_string())
+                };
+                let meaning_cow = match meaning.meaning.as_deref() {
+                    Some(s) => borrow::Cow::from(s),
+                    None => borrow::Cow::from("Missing Primary Meaning".to_string())
+                };
+
+                let subject_with_stat = SubjectWithStats {
+                    characters: characters_cow,
+                    primary_meaning: meaning_cow,
+                    meaning_correct: review_stat.meaning_correct,
+                    meaning_incorrect: review_stat.meaning_incorrect,
+                    reading_correct: review_stat.reading_correct,
+                    reading_incorrect: review_stat.reading_incorrect,
+                };
+
+                subjects_with_stats.push(subject_with_stat);
+            }
+        }
+
+        subjects_with_stats
     }
 }
 

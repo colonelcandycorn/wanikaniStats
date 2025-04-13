@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::error;
 use std::fmt;
 use std::marker::PhantomData;
+use std::borrow;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 struct User {
@@ -51,6 +52,16 @@ struct Subject {
     level: i32,
     spaced_repetition_system_id: i32,
     meanings: Vec<Meanings>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct SubjectWithStats<'a> {
+    characters: borrow::Cow<'a, str>,
+    primary_meaning: borrow::Cow<'a, str>,
+    meaning_correct: i32,
+    meaning_incorrect: i32,
+    reading_correct: i32,
+    reading_incorrect: i32,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
