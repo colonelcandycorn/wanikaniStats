@@ -178,25 +178,38 @@ impl CompleteUserInfo {
 
             for meaning in &subject_with_type.subject.meanings {
                 if !meaning.primary {
-                    continue
+                    continue;
                 }
 
                 let characters_cow = match subject_with_type.subject.characters.as_deref() {
                     Some(s) => borrow::Cow::from(s),
-                    None => borrow::Cow::from("Missing Characters".to_string())
+                    None => borrow::Cow::from("Missing Characters".to_string()),
                 };
                 let meaning_cow = match meaning.meaning.as_deref() {
                     Some(s) => borrow::Cow::from(s),
-                    None => borrow::Cow::from("Missing Primary Meaning".to_string())
+                    None => borrow::Cow::from("Missing Primary Meaning".to_string()),
                 };
+
+                // Calculate the percentages for meaning and reading
+                let before_trunc_meaning_percentage = (review_stat.meaning_correct as f64
+                    / (review_stat.meaning_correct + review_stat.meaning_incorrect) as f64)
+                    * 100.0;
+
+                let before_trunc_reading_percentage = (review_stat.reading_correct as f64
+                    / (review_stat.reading_correct + review_stat.reading_incorrect) as f64)
+                    * 100.0;
+
+                // Truncate the percentages to 2 decimal places -> stackoverflow
+                let meaning_percentage =
+                    f64::trunc(before_trunc_meaning_percentage * 100.0) / 100.0;
+                let reading_percentage =
+                    f64::trunc(before_trunc_reading_percentage * 100.0) / 100.0;
 
                 let subject_with_stat = SubjectWithStats {
                     characters: characters_cow,
                     primary_meaning: meaning_cow,
-                    meaning_correct: review_stat.meaning_correct,
-                    meaning_incorrect: review_stat.meaning_incorrect,
-                    reading_correct: review_stat.reading_correct,
-                    reading_incorrect: review_stat.reading_incorrect,
+                    meaning_percentage: meaning_percentage,
+                    reading_percentage: reading_percentage,
                 };
 
                 subjects_with_stats.push(subject_with_stat);

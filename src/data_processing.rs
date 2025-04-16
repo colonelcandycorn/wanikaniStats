@@ -4,11 +4,11 @@ pub mod complete_user_info;
 use chrono::{DateTime, Local};
 use governor::DefaultDirectRateLimiter;
 use serde::{Deserialize, Serialize};
+use std::borrow;
 use std::collections::HashMap;
 use std::error;
 use std::fmt;
 use std::marker::PhantomData;
-use std::borrow;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 struct User {
@@ -58,10 +58,8 @@ struct Subject {
 pub struct SubjectWithStats<'a> {
     characters: borrow::Cow<'a, str>,
     primary_meaning: borrow::Cow<'a, str>,
-    meaning_correct: i32,
-    meaning_incorrect: i32,
-    reading_correct: i32,
-    reading_incorrect: i32,
+    meaning_percentage: f64,
+    reading_percentage: f64,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
